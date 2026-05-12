@@ -1,0 +1,3 @@
+blind_assist_system:
+  ros__parameters:
+    notes: "Bringup package placeholder for future system-level parameters."

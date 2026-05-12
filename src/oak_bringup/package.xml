@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>oak_bringup</name>
+  <version>0.1.0</version>
+  <description>Launch files and system-level configuration for blind assist bringup.</description>
+  <maintainer email="user@example.com">abcd</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>oak_detectors</exec_depend>
+  <exec_depend>oak_decision_audio</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

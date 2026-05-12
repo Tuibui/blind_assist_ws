@@ -1,0 +1,2 @@
+#!/bin/sh
+exec python3 -c 'import sys; from oak_detectors.main_pipeline import main; main(sys.argv[1:])' "$@"

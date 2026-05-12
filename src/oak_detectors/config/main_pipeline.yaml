@@ -1,0 +1,17 @@
+main_pipeline_node:
+  ros__parameters:
+    money_output_topic: /money/detections
+    navigation_output_topic: /navigation/detections
+    current_mode_topic: /oak/current_mode
+    confidence_threshold: 0.70
+    camera_fps: 15.0
+    preview_width: 224
+    preview_height: 224
+    display_enabled: true
+    display_window_name: THB Bills Preview
+    reconnect_period_sec: 2.0
+    smoothing_window: 7
+    stable_ratio_threshold: 0.60
+    log_probabilities: true
+    publish_empty_navigation: true
+    log_model_usage: true

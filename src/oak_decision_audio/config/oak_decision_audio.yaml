@@ -1,0 +1,39 @@
+decision_audio_node:
+  ros__parameters:
+    money_detections_topic: /money/detections
+    navigation_detections_topic: /navigation/detections
+    current_mode_topic: /oak/current_mode
+    cooldown_sec: 2.0
+    tts_enabled: false
+    tts_command: edge-playback
+    tts_voice_th: th-TH-PremwadeeNeural
+    tts_voice_en: en-US-EmmaNeural
+    speak_zero_detections: false
+    announce_mode_changes: true
+    announce_detections: true
+
+speech_logger_node:
+  ros__parameters:
+    language: th-TH
+    backend: arecord
+    mode_cmd_topic: /oak/mode_cmd
+    walk_phrase: "เดินต่อไป"
+    money_phrase: "เช็คธนบัตร"
+    tts_enabled: false
+    tts_command: edge-playback
+    tts_voice_th: th-TH-PremwadeeNeural
+    tts_voice_en: en-US-EmmaNeural
+    announce_matched_commands: false
+    device_index: -1
+    arecord_device: default
+    sample_rate_hz: 16000
+    log_microphones: false
+    suppress_alsa_errors: true
+    listen_timeout_sec: 5.0
+    phrase_time_limit_sec: 3.0
+    arecord_chunk_sec: 3.0
+    ambient_duration_sec: 1.0
+    energy_threshold: 300
+    pause_threshold_sec: 0.8
+    min_rms_threshold: 140
+    log_silence_skips: false

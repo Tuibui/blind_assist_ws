@@ -1,0 +1,5 @@
+oak_test_node:
+  ros__parameters:
+    image_topic: /oak/rgb/image_raw
+    window_name: "OAK Camera Viewer"
+    show_fps: true

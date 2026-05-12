@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>oak_decision_audio</name>
+  <version>0.1.0</version>
+  <description>Python decision and audio output skeleton for blind assist guidance.</description>
+  <maintainer email="user@example.com">abcd</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>oak_interfaces</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>oak_detectors</name>
+  <version>0.1.0</version>
+  <description>Python detector node skeletons for money and navigation perception.</description>
+  <maintainer email="user@example.com">abcd</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>oak_interfaces</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,14 @@
+build/
+install/
+log/
+venv/
+.venv/
+.cache/
+.depthai_cached_models/
+latest_codex.txt
+
+__pycache__/
+*.py[cod]
+
+.DS_Store
+Thumbs.db

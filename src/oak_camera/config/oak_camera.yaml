@@ -1,0 +1,18 @@
+oak_camera_node:
+  ros__parameters:
+    mode_cmd_topic: /oak/mode_cmd
+    current_mode_topic: /oak/current_mode
+    image_topic: /oak/rgb/image_raw
+    publish_period_ms: 10
+    camera_fps: 30.0
+    default_mode: 1
+    use_mock_camera: false
+    frame_id: oak_rgb_camera_frame
+    width: 640
+    height: 400
+    walk_manual_focus: 20
+    money_close_focus: 150
+    reconnect_period_sec: 5.0
+    display_gui: false
+    window_name: "OAK Camera"
+    flip_vertical: true

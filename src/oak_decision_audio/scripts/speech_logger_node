@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec python3 -c 'import sys; from oak_decision_audio.speech_logger_node import main; main(sys.argv[1:])' "$@"
