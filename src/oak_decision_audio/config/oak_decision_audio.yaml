@@ -2,28 +2,69 @@ decision_audio_node:
   ros__parameters:
     money_detections_topic: /money/detections
     navigation_detections_topic: /navigation/detections
+    face_detections_topic: /face/detections
+    # Walk-mode tactile path guidance (spoken: ตรงไป/เลี้ยวซ้าย/เลี้ยวขวา/หยุด ตัดสินใจ).
+    # Direction = majority vote over the last tactile_window_sec of frames
+    # (tolerates per-frame flicker); spoken when the winning direction changes.
+    # Obstacle warnings take priority and mute directions for tactile_obstacle_mute_sec.
+    tactile_detections_topic: /tactile/path
+    tactile_announce_enabled: true
+    tactile_window_sec: 1.0
+    tactile_min_samples: 5
+    tactile_obstacle_mute_sec: 2.0
+    # Hold a spoken direction at least this long before switching to a different
+    # one (anti-flip-flop). Raise it if directions feel chatty; STOP ignores it.
+    tactile_min_dwell_sec: 2.5
+    face_repeat_sec: 5.0
     current_mode_topic: /oak/current_mode
     cooldown_sec: 2.0
-    tts_enabled: false
+    tts_enabled: true
     tts_command: edge-playback
     tts_voice_th: th-TH-PremwadeeNeural
     tts_voice_en: en-US-EmmaNeural
-    speak_zero_detections: false
     announce_mode_changes: true
     announce_detections: true
+    boot_greeting_enabled: true
+    boot_greeting_th: "ระบบพร้อมใช้งาน โหมดเดิน"
+    boot_greeting_en: "System ready. Walk mode."
+    money_confirm_count: 10
+    money_gap_sec: 3.0
+    language_topic: /oak/language
+    default_language: th
+    announcement_topic: /oak/announcement
+    undervoltage_check_enabled: true
+    undervoltage_check_interval_sec: 10.0
+    undervoltage_repeat_sec: 60.0
+    undervoltage_th: "คำเตือน ไฟเลี้ยงต่ำ กรุณาตรวจสอบแบตเตอรี่"
+    undervoltage_en: "Warning, low power supply. Please check the battery."
+
+web_display_node:
+  ros__parameters:
+    current_mode_topic: /oak/current_mode
+    announcement_topic: /oak/announcement
+    preview_topic: /oak/preview/compressed
+    http_host: 0.0.0.0
+    http_port: 8080
 
 speech_logger_node:
   ros__parameters:
     language: th-TH
     backend: arecord
     mode_cmd_topic: /oak/mode_cmd
+    language_topic: /oak/language
+    default_language: th
     walk_phrase: "เดินต่อไป"
     money_phrase: "เช็คธนบัตร"
+    face_phrase: "สวัสดี"
+    # Muted: decision_audio_node is the single voice of the system (its speech
+    # manager arbitrates everything). speech_logger only listens + publishes
+    # mode/language commands, so it must not speak (would overlap). Mode changes
+    # are still announced by decision_audio via /oak/current_mode.
     tts_enabled: false
+    announce_matched_commands: false
     tts_command: edge-playback
     tts_voice_th: th-TH-PremwadeeNeural
     tts_voice_en: en-US-EmmaNeural
-    announce_matched_commands: false
     device_index: -1
     arecord_device: default
     sample_rate_hz: 16000

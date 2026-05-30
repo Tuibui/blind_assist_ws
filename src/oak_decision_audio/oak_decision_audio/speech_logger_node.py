@@ -13,8 +13,11 @@ from typing import Optional
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Bool, String
 
 from oak_interfaces.msg import Mode
+
+from .audio_env import ensure_audio_session_env
 
 
 ERROR_HANDLER_FUNC = ctypes.CFUNCTYPE(
@@ -38,8 +41,14 @@ class SpeechLoggerNode(Node):
         self.declare_parameter("language", "th-TH")
         self.declare_parameter("backend", "arecord")
         self.declare_parameter("mode_cmd_topic", "/oak/mode_cmd")
+        # คำสั่งเสียง "เปิด/ปิดระบบนำทาง" ส่งเป็น std_msgs/Bool ไปยัง main_pipeline
+        # โดยไม่เปลี่ยนโหมด (ยังอยู่ในโหมดเดิน สิ่งกีดขวางยังตรวจอยู่)
+        self.declare_parameter("nav_cmd_topic", "/oak/nav_cmd")
+        self.declare_parameter("language_topic", "/oak/language")
+        self.declare_parameter("default_language", "th")
         self.declare_parameter("walk_phrase", "เดินต่อไป")
         self.declare_parameter("money_phrase", "เช็คธนบัตร")
+        self.declare_parameter("face_phrase", "สวัสดี")
         self.declare_parameter("tts_enabled", True)
         self.declare_parameter("tts_command", "edge-playback")
         self.declare_parameter("tts_voice_th", "th-TH-PremwadeeNeural")
@@ -59,9 +68,15 @@ class SpeechLoggerNode(Node):
         self.declare_parameter("min_rms_threshold", 120)
         self.declare_parameter("log_silence_skips", False)
 
-        self._language = str(self.get_parameter("language").value)
+        self._recognition_language_th = "th-TH"
+        self._recognition_language_en = "en-US"
+        default_lang = str(self.get_parameter("default_language").value).strip().lower()
+        self._app_language = "en" if default_lang.startswith("en") else "th"
+        self._language = self._recognition_language_th if self._app_language == "th" else self._recognition_language_en
         self._backend = str(self.get_parameter("backend").value).strip().lower()
         self._mode_cmd_topic = str(self.get_parameter("mode_cmd_topic").value)
+        self._nav_cmd_topic = str(self.get_parameter("nav_cmd_topic").value)
+        self._language_topic = str(self.get_parameter("language_topic").value)
         self._walk_phrase = str(self.get_parameter("walk_phrase").value).strip().lower()
         self._money_phrases = {
             str(self.get_parameter("money_phrase").value).strip().lower(),
@@ -73,6 +88,14 @@ class SpeechLoggerNode(Node):
             "walk",
             "go forward",
         }
+        # Greeting a person triggers face-recognition mode (mode 3).
+        self._face_phrases = {
+            str(self.get_parameter("face_phrase").value).strip().lower(),
+            "สวัสดี",
+            "ดีครับ",
+            "ดีค่ะ",
+            "hello",
+        }
         self._money_phrases.update(
             {
                 "check banknote",
@@ -82,6 +105,24 @@ class SpeechLoggerNode(Node):
                 "banknote mode",
             }
         )
+        # คำสั่ง "ปิดระบบนำทาง" — หยุดตรวจทางเดิน (tactile) แต่ยังตรวจสิ่งกีดขวาง
+        self._nav_off_phrases = {
+            "ปิดระบบนำทาง",
+            "ปิดนำทาง",
+            "navigation off",
+            "turn off navigation",
+            "disable navigation",
+            "stop navigation",
+        }
+        # คำสั่ง "เปิดระบบนำทาง" — เอาการตรวจทางเดิน (tactile) กลับมา
+        self._nav_on_phrases = {
+            "เปิดระบบนำทาง",
+            "เปิดนำทาง",
+            "navigation on",
+            "turn on navigation",
+            "enable navigation",
+            "start navigation",
+        }
         self._tts_enabled = bool(self.get_parameter("tts_enabled").value)
         self._tts_command = str(self.get_parameter("tts_command").value).strip()
         self._tts_voice_th = str(self.get_parameter("tts_voice_th").value).strip()
@@ -103,6 +144,10 @@ class SpeechLoggerNode(Node):
         self._running = True
         self._alsa_error_handler = ERROR_HANDLER_FUNC(_py_error_handler)
         self._mode_publisher = self.create_publisher(Mode, self._mode_cmd_topic, 10)
+        self._nav_publisher = self.create_publisher(Bool, self._nav_cmd_topic, 10)
+        # Subscribe only: language is set at launch, but can still be overridden
+        # at runtime via `ros2 topic pub /oak/language std_msgs/String "data: en"`.
+        self.create_subscription(String, self._language_topic, self._on_language, 10)
         self._speech_queue = queue.Queue()
         self._tts_available = bool(self._tts_command) and shutil.which(self._tts_command) is not None
 
@@ -175,7 +220,30 @@ class SpeechLoggerNode(Node):
     def _announce_bilingual(self, text_th: str, text_en: str, log_message: Optional[str] = None) -> None:
         if log_message:
             self._safe_info(log_message)
-        self._enqueue_bilingual_speech(text_th, text_en)
+        if self._app_language == "en":
+            voice = self._tts_voice_en
+            text = text_en
+        else:
+            voice = self._tts_voice_th
+            text = text_th
+        if not text:
+            return
+        try:
+            while self._speech_queue.qsize() > 1:
+                self._speech_queue.get_nowait()
+        except queue.Empty:
+            pass
+        self._speech_queue.put_nowait([(text, voice)])
+
+    def _on_language(self, msg: String) -> None:
+        new_lang = (msg.data or "").strip().lower()
+        if new_lang not in ("th", "en"):
+            return
+        if new_lang == self._app_language:
+            return
+        self._app_language = new_lang
+        self._language = self._recognition_language_th if new_lang == "th" else self._recognition_language_en
+        self._safe_info(f"Recognition language switched to {self._language}")
 
     def _enqueue_speech(self, text: str) -> None:
         if not text:
@@ -365,23 +433,51 @@ class SpeechLoggerNode(Node):
             self._publish_mode_from_transcript(transcript)
 
     def _publish_mode_from_transcript(self, transcript: str) -> None:
+        # Language is fixed at launch (launch arg `language:=en|th`); it is no
+        # longer switchable by voice. Only mode commands are matched here.
         normalized = transcript.strip().lower()
+        # Navigation on/off is a sub-toggle of walk mode (tactile only); it does
+        # not change mode, so match it before the mode phrases. "off" is checked
+        # first because "ปิดระบบนำทาง"/"เปิดระบบนำทาง" share the "ระบบนำทาง" stem.
+        if any(phrase and phrase in normalized for phrase in self._nav_off_phrases):
+            self._publish_nav(False, transcript, "ปิดระบบนำทาง", "Navigation off")
+            return
+        if any(phrase and phrase in normalized for phrase in self._nav_on_phrases):
+            self._publish_nav(True, transcript, "เปิดระบบนำทาง", "Navigation on")
+            return
         if any(phrase and phrase in normalized for phrase in {self._walk_phrase, *self._walk_phrases_en}):
             self._publish_mode(Mode.WALK, transcript, "เดินต่อไป", "Walk mode")
             return
         if any(phrase and phrase in normalized for phrase in self._money_phrases):
             self._publish_mode(Mode.MONEY, transcript, "เช็คธนบัตร", "Money mode")
             return
+        if any(phrase and phrase in normalized for phrase in self._face_phrases):
+            # Face mode: switch silently, no mode announcement (the names spoken
+            # by decision_audio are the only feedback the user gets).
+            self._publish_mode(Mode.FACE, transcript, "ทักทาย", "Greeting", announce=False)
+            return
         self._announce_bilingual("พูดใหม่", "Say again", f'Unrecognized speech command from "{transcript}".')
 
-    def _publish_mode(self, mode_value: int, transcript: str, command_label_th: str, command_label_en: str) -> None:
+    def _publish_mode(self, mode_value: int, transcript: str, command_label_th: str, command_label_en: str, announce: bool = True) -> None:
         msg = Mode()
         msg.mode = mode_value
         self._mode_publisher.publish(msg)
-        mode_name = "WALK(0)" if mode_value == Mode.WALK else "MONEY(1)"
+        mode_name = {Mode.WALK: "WALK(0)", Mode.MONEY: "MONEY(1)", Mode.FACE: "FACE(2)"}.get(mode_value, str(mode_value))
         self._safe_info(f'Voice command matched "{command_label_th} / {command_label_en}" -> publish {mode_name} from "{transcript}"')
-        if self._announce_matched_commands:
+        if announce and self._announce_matched_commands:
             self._announce_bilingual(command_label_th, command_label_en)
+
+    def _publish_nav(self, enabled: bool, transcript: str, command_label_th: str, command_label_en: str) -> None:
+        msg = Bool()
+        msg.data = enabled
+        self._nav_publisher.publish(msg)
+        self._safe_info(
+            f'Voice command matched "{command_label_th} / {command_label_en}" '
+            f'-> publish nav={enabled} from "{transcript}"'
+        )
+        # Always announce nav on/off so the user gets feedback for the toggle,
+        # even when announce_matched_commands is off for mode switches.
+        self._announce_bilingual(command_label_th, command_label_en)
 
     def _safe_info(self, message: str) -> None:
         if self._running and rclpy.ok():
@@ -415,8 +511,13 @@ class SpeechLoggerNode(Node):
 
 
 def main(args=None) -> None:
+    # Reach the user's PipeWire/PulseAudio session even when launched over SSH
+    # (a remote shell lacks XDG_RUNTIME_DIR/PULSE_SERVER, which breaks the mic).
+    applied = ensure_audio_session_env()
     rclpy.init(args=args)
     node = SpeechLoggerNode()
+    if applied:
+        node.get_logger().info("Audio session env set for headless/SSH: " + ", ".join(applied))
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

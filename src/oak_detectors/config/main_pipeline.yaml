@@ -2,16 +2,64 @@ main_pipeline_node:
   ros__parameters:
     money_output_topic: /money/detections
     navigation_output_topic: /navigation/detections
+    face_output_topic: /face/detections
     current_mode_topic: /oak/current_mode
-    confidence_threshold: 0.70
-    camera_fps: 15.0
-    preview_width: 224
-    preview_height: 224
-    display_enabled: true
-    display_window_name: THB Bills Preview
+    # NN Archive (.tar.xz) produced by tools.luxonis.com (RVC2, 416, YOLO11)
+    # Classes intrinsic to model: 0=20, 1=50, 2=100, 3=500, 4=1000
+    money_labels: ["20", "50", "100", "500", "1000"]
+    # Per-class confidence thresholds, applied on host after on-device NMS.
+    # Use -1.0 to fall back to confidence_threshold for that class.
+    confidence_threshold: 0.20
+    confidence_thresholds: [0.20, 0.20, 0.40, 0.20, 0.20]
+    # Face recognition (mode 3): NN Archive at models/myfriend_face/best.rvc2.tar.xz
+    # (path is auto-resolved like money_model_path). Classes intrinsic to model:
+    # ["Tee", "Ping"]. Just speak whoever is seen.
+    face_labels: ["Tee", "Ping"]
+    face_confidence_threshold: 0.7
+    camera_fps: 30.0
+    nn_input_size: 416
+    rotate_preview_180: true
     reconnect_period_sec: 2.0
-    smoothing_window: 7
-    stable_ratio_threshold: 0.60
-    log_probabilities: true
     publish_empty_navigation: true
     log_model_usage: true
+    mode_cmd_topic: /oak/mode_cmd
+    default_mode: walk
+    log_window_frames: 2
+    # Walk-mode obstacle detection: stereo depth only (no NN). Depth map is
+    # split into left/center/right columns; a zone alerts when enough of its
+    # pixels are closer than walk_obstacle_z_max_mm.
+    walk_obstacle_z_max_mm: 500.0
+    # Min fraction of a zone's pixels that must be near to count as an obstacle.
+    walk_obstacle_min_pixel_frac: 0.04
+    # Vertical ROI (fraction of height) — trims ceiling/floor from analysis.
+    walk_roi_top_frac: 0.1
+    walk_roi_bottom_frac: 0.9
+    # Fixed CAM_A lens position so autofocus does not hunt (0=far, 255=macro)
+    walk_manual_focus: 15
+    # Live JPEG preview pushed to the web dashboard (walk = RGB camera frame,
+    # money = small camera output). Set preview_enabled: false to save CPU/bandwidth.
+    preview_enabled: true
+    preview_topic: /oak/preview/compressed
+    preview_jpeg_quality: 50
+    preview_max_width: 480
+    # Tactile paving (yellow color path) detection — runs concurrently in walk mode
+    tactile_enabled: true
+    tactile_output_topic: /tactile/path
+    tactile_input_width: 640
+    tactile_input_height: 360
+    tactile_h_lo: 5
+    tactile_h_hi: 20
+    tactile_s_lo: 25
+    tactile_v_lo: 85
+    tactile_horizon: 0.20
+    tactile_bottom: 0.30
+    tactile_center: 0.30
+    tactile_dead_off: 0.10
+    tactile_sharp_off: 0.30
+    # Pause tactile detection this many seconds when a depth obstacle is near
+    # (stops a close person's legs being read as the path). 0 disables.
+    tactile_obstacle_pause_sec: 2.0
+    # TEMP: set to a video path to test walk-mode tactile detection from a file
+    # instead of the OAK camera (no depth/obstacle alerts in this mode). "" = live camera.
+    tactile_video_source: ""
+

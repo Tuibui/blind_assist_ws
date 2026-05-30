@@ -1,2 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
+# ตัวรัน node main_pipeline: เรียกฟังก์ชัน main() ในโมดูล Python ตรง ๆ
+# ใช้ bash wrapper แทน console_scripts เพื่อเลี่ยงปัญหา shebang ผิด python (ดู HANDOFF.md)
 exec python3 -c 'import sys; from oak_detectors.main_pipeline import main; main(sys.argv[1:])' "$@"
