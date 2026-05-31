@@ -127,12 +127,24 @@ When true: log `[obstacle] <zone> <dist>m (<frac>%)` warning at 1 Hz, publish on
 
 | Phrase | Action |
 |---|---|
-| "เดินต่อไป" / "walk mode" / "walk" / "go forward" / "keep walking" | → WALK mode |
-| "เช็คธนบัตร" / "เช็กธนบัตร" / "check banknote" / "money mode" | → MONEY mode |
-| "ภาษาอังกฤษ" / "อังกฤษ" / "english" / "switch to english" | → EN language |
-| "ภาษาไทย" / "ไทย" / "thai" / "switch to thai" | → TH language |
+| "เดินต่อไป" / EN keyword: `walk`, `forward` | → WALK mode |
+| "เช็คธนบัตร" / "เช็กธนบัตร" / EN keyword: `money`, `banknote`, `cash` | → MONEY mode |
+| "สวัสดี" / "ดีครับ" / "ดีค่ะ" / EN keyword: `hello`, `hi`, `hey` | → FACE mode |
+| "เปิด" / EN keyword: `on`, `enable`, `start`, `resume` | → navigation ON (WALK only) |
+| "ปิด" / EN keyword: `off`, `disable`, `stop`, `pause` | → navigation OFF (WALK only) |
 
-SR language follows app language (`th-TH` / `en-US`). To switch language, say the phrase in the *current* language.
+**Partial detection — only one keyword is needed, not the full phrase.**
+- **Thai** is matched as a **substring** anywhere in the sentence (Thai words run together),
+  e.g. "เปิดระบบนำทางหน่อย" matches "เปิด". "เปิด" (on) is checked before "ปิด" (off)
+  because "ปิด" is a substring of "เปิด".
+- **English** is matched on **whole-word tokens** (`re.findall(r"[a-z]+", ...)`), so saying
+  just "money" or "off" works. Token (not substring) matching is required because short
+  words like "on" are substrings of other words ("navigati**on**"). Full English phrases
+  ("navigation off", "check banknote", …) still match too.
+- Navigation on/off is a **sub-toggle of WALK mode** (tactile path only — it does NOT change
+  mode; obstacle detection keeps running). It is **gated to WALK mode**; ignored in money/face.
+
+SR language is fixed at launch (`th-TH` / `en-US`); language is no longer switchable by voice.
 
 ## Critical conventions
 
@@ -214,6 +226,11 @@ ros2 topic pub --once /oak/language std_msgs/String "data: en"
 
 ## Things cleaned this session
 
+- **English voice commands → partial keyword detection**: English commands no longer require
+  the full phrase. `speech_logger_node` now tokenizes English speech into whole words and
+  matches single keywords (`money`/`banknote`/`cash`, `walk`/`forward`, `on`/`off`/`enable`/
+  `disable`/`start`/`stop`/`resume`/`pause`, `hello`/`hi`/`hey`). Token matching (not substring)
+  fixes a latent bug where "on" matches inside "navigati**on**". Thai still matched as substring.
 - **GUI → web**: removed the OpenCV tactile preview window (`cv2.imshow`) entirely. Added `web_display_node` (stdlib HTTP server, port 8080) showing a live MJPEG video stream + current mode + latest alert text. `main_pipeline` publishes JPEG preview frames on `/oak/preview/compressed` (walk reuses the RGB tactile frame, money uses a small camera output); `web_display_node` re-serves them as MJPEG at `/stream`. `decision_audio_node` publishes `/oak/announcement`, and obstacle alerts are spoken/shown as friendly bilingual phrases ("ระวัง สิ่งกีดขวาง ด้านหน้า" / "Obstacle ahead").
 - **Repo cleanup**: removed unused `oak_camera` + `oak_test` packages; deleted the 401 MB `tractile_model/` training tree (incl. a stray nested `.git`) — kept only the runtime `scripts/color_path_detect.py`; moved reference pipelines (`money_detect_ref_pipeline.py`, `test_yolo11_oak_new_reference.py`) into `oak_detectors/tools/`; deleted the now-unused `mobilenet-ssd...blob`; removed duplicate `src/{build,install,log}` artifacts. The runtime module is now just `main_pipeline.py` + `tractile_model/`.
 - **Walk mode → depth-only**: dropped MobileNet-SSD entirely; obstacle detection is now stereo-depth left/center/right zones (see Walk pipeline details). Locked CAM_A manual focus so the lens stops hunting.

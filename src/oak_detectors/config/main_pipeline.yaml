@@ -1,60 +1,152 @@
 main_pipeline_node:
   ros__parameters:
-    money_output_topic: /money/detections
-    navigation_output_topic: /navigation/detections
-    face_output_topic: /face/detections
-    current_mode_topic: /oak/current_mode
+    # =====================================================================
+    # Output topics — where each detector publishes its results.
+    # Rename only if downstream subscribers (web dashboard, audio node) are
+    # changed to match. Tuning these does not affect detection itself.
+    # =====================================================================
+    money_output_topic: /money/detections          # banknote detection results (mode 2)
+    navigation_output_topic: /navigation/detections # walk-mode obstacle alerts (mode 1)
+    face_output_topic: /face/detections            # face recognition results (mode 3)
+    current_mode_topic: /oak/current_mode          # node publishes the active mode here
+
+    # =====================================================================
+    # Money detection (mode 2)
+    # =====================================================================
     # NN Archive (.tar.xz) produced by tools.luxonis.com (RVC2, 416, YOLO11)
     # Classes intrinsic to model: 0=20, 1=50, 2=100, 3=500, 4=1000
+    # money_labels: spoken/published names per class index. Order MUST match
+    # the model's class order, or the wrong denomination will be announced.
     money_labels: ["20", "50", "100", "500", "1000"]
     # Per-class confidence thresholds, applied on host after on-device NMS.
     # Use -1.0 to fall back to confidence_threshold for that class.
+    # confidence_threshold: global default minimum confidence (0.0–1.0).
+    #   Raise  -> fewer false detections, but may miss unclear notes.
+    #   Lower  -> catches more notes, but risks misreads.
     confidence_threshold: 0.20
+    # confidence_thresholds: one value per money class (20/50/100/500/1000).
+    #   Here the 100 note is set higher (0.40) because it is easily confused;
+    #   tune an individual class up if it produces false positives.
     confidence_thresholds: [0.20, 0.20, 0.40, 0.20, 0.20]
+
+    # =====================================================================
+    # Face recognition (mode 3)
+    # =====================================================================
     # Face recognition (mode 3): NN Archive at models/myfriend_face/best.rvc2.tar.xz
     # (path is auto-resolved like money_model_path). Classes intrinsic to model:
     # ["Tee", "Ping"]. Just speak whoever is seen.
+    # face_labels: known person names, order must match the model's classes.
     face_labels: ["Tee", "Ping"]
+    # face_confidence_threshold: min confidence to announce a face (0.0–1.0).
+    #   Kept high (0.7) so it only speaks a name when fairly sure.
+    #   Raise -> fewer wrong-name calls; Lower -> recognizes from further/blurrier.
     face_confidence_threshold: 0.7
+
+    # =====================================================================
+    # Camera / pipeline
+    # =====================================================================
+    # camera_fps: frames per second from the OAK camera.
+    #   Higher -> smoother, faster reaction, but more CPU/USB load & heat.
+    #   Lower  -> lighter on the Raspberry Pi, but slower alerts.
     camera_fps: 30.0
+    # nn_input_size: square input size (px) fed to the neural network.
+    #   Must match the size the model was exported with (here 416). Do not
+    #   change unless you also re-export the model.
     nn_input_size: 416
+    # rotate_preview_180: rotate the image 180°. Set true when the camera is
+    #   physically mounted upside down so the preview/detections are upright.
     rotate_preview_180: true
+    # reconnect_period_sec: seconds to wait before retrying if the OAK device
+    #   drops off USB. Lower -> reconnects sooner; higher -> less log spam.
     reconnect_period_sec: 2.0
+    # publish_empty_navigation: in walk mode, publish an empty message when no
+    #   obstacle is seen (true) so subscribers know "all clear", vs staying
+    #   silent (false) to save bandwidth.
     publish_empty_navigation: true
+    # log_model_usage: log which model/mode is running each cycle (debugging).
     log_model_usage: true
+    # mode_cmd_topic: topic the node listens on for mode-switch commands.
     mode_cmd_topic: /oak/mode_cmd
+    # default_mode: which mode to start in (walk / money / face).
     default_mode: walk
+    # log_window_frames: number of consecutive frames aggregated before a
+    #   detection is logged/acted on. Higher -> steadier, fewer flickers, but
+    #   slightly more lag; lower -> snappier but noisier.
     log_window_frames: 2
+
+    # =====================================================================
+    # Walk-mode obstacle detection (stereo depth only, no NN)
+    # =====================================================================
     # Walk-mode obstacle detection: stereo depth only (no NN). Depth map is
     # split into left/center/right columns; a zone alerts when enough of its
     # pixels are closer than walk_obstacle_z_max_mm.
+    # walk_obstacle_z_max_mm: distance (mm) under which a pixel counts as an
+    #   obstacle. Larger -> warns about things further away (more cautious);
+    #   smaller -> only warns when something is very close.
     walk_obstacle_z_max_mm: 500.0
     # Min fraction of a zone's pixels that must be near to count as an obstacle.
+    #   Higher -> needs a bigger/closer object to trigger (fewer false alarms);
+    #   lower  -> reacts to small objects (more sensitive, more false alarms).
     walk_obstacle_min_pixel_frac: 0.04
     # Vertical ROI (fraction of height) — trims ceiling/floor from analysis.
+    #   top_frac=0.1 ignores top 10%, bottom_frac=0.9 ignores below 90%, so
+    #   only the middle band (where obstacles matter) is examined.
     walk_roi_top_frac: 0.1
     walk_roi_bottom_frac: 0.9
     # Fixed CAM_A lens position so autofocus does not hunt (0=far, 255=macro)
+    #   Set for typical walking distance; raise toward 255 to focus closer.
     walk_manual_focus: 15
+
+    # =====================================================================
+    # Live preview (JPEG stream to the web dashboard)
+    # =====================================================================
     # Live JPEG preview pushed to the web dashboard (walk = RGB camera frame,
     # money = small camera output). Set preview_enabled: false to save CPU/bandwidth.
     preview_enabled: true
-    preview_topic: /oak/preview/compressed
+    preview_topic: /oak/preview/compressed         # topic the preview is published on
+    # preview_jpeg_quality: JPEG quality 0–100.
+    #   Higher -> sharper image but larger/slower frames; lower -> lighter.
     preview_jpeg_quality: 50
+    # preview_max_width: preview is downscaled to at most this width (px).
+    #   Smaller -> less bandwidth/CPU; larger -> more detail on the dashboard.
     preview_max_width: 480
+
+    # =====================================================================
+    # Tactile paving (yellow guidance path) detection — runs with walk mode.
+    # Detects the yellow path via HSV color thresholding, then reports which
+    # way to steer to stay on it.
+    # =====================================================================
     # Tactile paving (yellow color path) detection — runs concurrently in walk mode
     tactile_enabled: true
-    tactile_output_topic: /tactile/path
+    tactile_output_topic: /tactile/path            # steering hint output topic
+    # tactile_input_width/height: resolution the color analysis runs at.
+    #   Smaller -> faster but coarser; larger -> more precise but heavier.
     tactile_input_width: 640
     tactile_input_height: 360
+    # HSV color gate for "yellow". A pixel is path if its hue is in
+    # [h_lo, h_hi] AND saturation >= s_lo AND value(brightness) >= v_lo.
+    #   tactile_h_lo / tactile_h_hi: yellow hue range. Widen if the path color
+    #     varies; narrow if other yellow-ish things get picked up.
     tactile_h_lo: 5
     tactile_h_hi: 20
+    #   tactile_s_lo: minimum saturation. Raise to reject washed-out/grey
+    #     surfaces; lower to catch faded paving.
     tactile_s_lo: 25
+    #   tactile_v_lo: minimum brightness. Raise to ignore dark/shadowed areas;
+    #     lower to detect the path in dim light.
     tactile_v_lo: 85
+    # Region/zone geometry, all as fractions of the frame:
+    #   tactile_horizon: ignore everything above this fraction (far away / sky).
     tactile_horizon: 0.20
+    #   tactile_bottom: how much of the lower frame to analyze for the path.
     tactile_bottom: 0.30
+    #   tactile_center: width of the central "straight ahead" band.
     tactile_center: 0.30
+    #   tactile_dead_off: dead-zone offset — path within this of center counts
+    #     as "go straight" (no steering call). Larger -> fewer minor corrections.
     tactile_dead_off: 0.10
+    #   tactile_sharp_off: offset beyond which a "sharp turn" is reported
+    #     instead of a gentle one. Larger -> only very off-path triggers "sharp".
     tactile_sharp_off: 0.30
     # Pause tactile detection this many seconds when a depth obstacle is near
     # (stops a close person's legs being read as the path). 0 disables.
@@ -62,4 +154,3 @@ main_pipeline_node:
     # TEMP: set to a video path to test walk-mode tactile detection from a file
     # instead of the OAK camera (no depth/obstacle alerts in this mode). "" = live camera.
     tactile_video_source: ""
-

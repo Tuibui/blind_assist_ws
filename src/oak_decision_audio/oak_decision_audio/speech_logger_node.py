@@ -5,6 +5,7 @@ import ctypes.util
 import io
 import json
 import queue
+import re
 import shutil
 import subprocess
 import threading
@@ -44,6 +45,8 @@ class SpeechLoggerNode(Node):
         # คำสั่งเสียง "เปิด/ปิดระบบนำทาง" ส่งเป็น std_msgs/Bool ไปยัง main_pipeline
         # โดยไม่เปลี่ยนโหมด (ยังอยู่ในโหมดเดิน สิ่งกีดขวางยังตรวจอยู่)
         self.declare_parameter("nav_cmd_topic", "/oak/nav_cmd")
+        # ใช้รู้ว่าตอนนี้อยู่โหมดอะไร — คำสั่งเปิด/ปิดนำทางทำได้เฉพาะตอน WALK
+        self.declare_parameter("current_mode_topic", "/oak/current_mode")
         self.declare_parameter("language_topic", "/oak/language")
         self.declare_parameter("default_language", "th")
         self.declare_parameter("walk_phrase", "เดินต่อไป")
@@ -76,7 +79,10 @@ class SpeechLoggerNode(Node):
         self._backend = str(self.get_parameter("backend").value).strip().lower()
         self._mode_cmd_topic = str(self.get_parameter("mode_cmd_topic").value)
         self._nav_cmd_topic = str(self.get_parameter("nav_cmd_topic").value)
+        self._current_mode_topic = str(self.get_parameter("current_mode_topic").value)
         self._language_topic = str(self.get_parameter("language_topic").value)
+        # โหมดปัจจุบัน เริ่มที่ WALK (โหมดเริ่มต้นตอนเปิดเครื่อง) อัปเดตจาก /oak/current_mode
+        self._current_mode = Mode.WALK
         self._walk_phrase = str(self.get_parameter("walk_phrase").value).strip().lower()
         self._money_phrases = {
             str(self.get_parameter("money_phrase").value).strip().lower(),
@@ -105,24 +111,33 @@ class SpeechLoggerNode(Node):
                 "banknote mode",
             }
         )
-        # คำสั่ง "ปิดระบบนำทาง" — หยุดตรวจทางเดิน (tactile) แต่ยังตรวจสิ่งกีดขวาง
+        # คำสั่ง "ปิด" — ปิดระบบนำทาง (หยุดตรวจทางเดิน tactile) แต่ยังตรวจสิ่งกีดขวาง
+        # แค่มีคำว่า "ปิด" อยู่ในประโยคก็พอ เช่น "ช่วยปิดระบบนำทางหน่อย"
         self._nav_off_phrases = {
-            "ปิดระบบนำทาง",
-            "ปิดนำทาง",
+            "ปิด",
             "navigation off",
             "turn off navigation",
             "disable navigation",
             "stop navigation",
         }
-        # คำสั่ง "เปิดระบบนำทาง" — เอาการตรวจทางเดิน (tactile) กลับมา
+        # คำสั่ง "เปิด" — เปิดระบบนำทางกลับมา (เอาการตรวจทางเดิน tactile กลับมา)
+        # แค่มีคำว่า "เปิด" อยู่ในประโยคก็พอ เช่น "เปิดระบบนำทางให้หน่อย"
         self._nav_on_phrases = {
-            "เปิดระบบนำทาง",
-            "เปิดนำทาง",
+            "เปิด",
             "navigation on",
             "turn on navigation",
             "enable navigation",
             "start navigation",
         }
+        # English keyword tokens — matched as whole words, so the user only has to
+        # say one keyword (e.g. just "money", "off") instead of the full phrase.
+        # Token (not substring) matching is required because short words like "on"
+        # are substrings of other words (e.g. "navigati-on").
+        self._walk_keywords_en = {"walk", "forward"}
+        self._money_keywords_en = {"money", "banknote", "cash"}
+        self._face_keywords_en = {"hello", "hi", "hey"}
+        self._nav_on_keywords_en = {"on", "enable", "start", "resume"}
+        self._nav_off_keywords_en = {"off", "disable", "stop", "pause"}
         self._tts_enabled = bool(self.get_parameter("tts_enabled").value)
         self._tts_command = str(self.get_parameter("tts_command").value).strip()
         self._tts_voice_th = str(self.get_parameter("tts_voice_th").value).strip()
@@ -148,6 +163,7 @@ class SpeechLoggerNode(Node):
         # Subscribe only: language is set at launch, but can still be overridden
         # at runtime via `ros2 topic pub /oak/language std_msgs/String "data: en"`.
         self.create_subscription(String, self._language_topic, self._on_language, 10)
+        self.create_subscription(Mode, self._current_mode_topic, self._on_current_mode, 10)
         self._speech_queue = queue.Queue()
         self._tts_available = bool(self._tts_command) and shutil.which(self._tts_command) is not None
 
@@ -244,6 +260,9 @@ class SpeechLoggerNode(Node):
         self._app_language = new_lang
         self._language = self._recognition_language_th if new_lang == "th" else self._recognition_language_en
         self._safe_info(f"Recognition language switched to {self._language}")
+
+    def _on_current_mode(self, msg: Mode) -> None:
+        self._current_mode = msg.mode
 
     def _enqueue_speech(self, text: str) -> None:
         if not text:
@@ -436,22 +455,30 @@ class SpeechLoggerNode(Node):
         # Language is fixed at launch (launch arg `language:=en|th`); it is no
         # longer switchable by voice. Only mode commands are matched here.
         normalized = transcript.strip().lower()
+        # English speech is matched on whole words ("tokens") so the user only has
+        # to say one keyword instead of the full phrase. Thai phrases are still
+        # matched as substrings (Thai words run together without spaces).
+        tokens = set(re.findall(r"[a-z]+", normalized))
         # Navigation on/off is a sub-toggle of walk mode (tactile only); it does
-        # not change mode, so match it before the mode phrases. "off" is checked
-        # first because "ปิดระบบนำทาง"/"เปิดระบบนำทาง" share the "ระบบนำทาง" stem.
-        if any(phrase and phrase in normalized for phrase in self._nav_off_phrases):
-            self._publish_nav(False, transcript, "ปิดระบบนำทาง", "Navigation off")
-            return
-        if any(phrase and phrase in normalized for phrase in self._nav_on_phrases):
-            self._publish_nav(True, transcript, "เปิดระบบนำทาง", "Navigation on")
-            return
-        if any(phrase and phrase in normalized for phrase in {self._walk_phrase, *self._walk_phrases_en}):
+        # not change mode, so match it before the mode phrases. Only the bare word
+        # "เปิด"/"ปิด" (or one English keyword) is required, anywhere in the sentence.
+        # Gated to WALK mode only — in money/face mode these commands are ignored.
+        # "เปิด" (on) MUST be checked first because "ปิด" (off) is a substring of
+        # "เปิด" — otherwise saying "เปิด" would wrongly trigger off.
+        if self._current_mode == Mode.WALK:
+            if any(phrase and phrase in normalized for phrase in self._nav_on_phrases) or (tokens & self._nav_on_keywords_en):
+                self._publish_nav(True, transcript, "เปิดระบบนำทาง", "Navigation on")
+                return
+            if any(phrase and phrase in normalized for phrase in self._nav_off_phrases) or (tokens & self._nav_off_keywords_en):
+                self._publish_nav(False, transcript, "ปิดระบบนำทาง", "Navigation off")
+                return
+        if any(phrase and phrase in normalized for phrase in {self._walk_phrase, *self._walk_phrases_en}) or (tokens & self._walk_keywords_en):
             self._publish_mode(Mode.WALK, transcript, "เดินต่อไป", "Walk mode")
             return
-        if any(phrase and phrase in normalized for phrase in self._money_phrases):
+        if any(phrase and phrase in normalized for phrase in self._money_phrases) or (tokens & self._money_keywords_en):
             self._publish_mode(Mode.MONEY, transcript, "เช็คธนบัตร", "Money mode")
             return
-        if any(phrase and phrase in normalized for phrase in self._face_phrases):
+        if any(phrase and phrase in normalized for phrase in self._face_phrases) or (tokens & self._face_keywords_en):
             # Face mode: switch silently, no mode announcement (the names spoken
             # by decision_audio are the only feedback the user gets).
             self._publish_mode(Mode.FACE, transcript, "ทักทาย", "Greeting", announce=False)
