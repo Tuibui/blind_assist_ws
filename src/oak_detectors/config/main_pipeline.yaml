@@ -83,7 +83,7 @@ main_pipeline_node:
     # walk_obstacle_z_max_mm: distance (mm) under which a pixel counts as an
     #   obstacle. Larger -> warns about things further away (more cautious);
     #   smaller -> only warns when something is very close.
-    walk_obstacle_z_max_mm: 500.0
+    walk_obstacle_z_max_mm: 1500.0
     # Min fraction of a zone's pixels that must be near to count as an obstacle.
     #   Higher -> needs a bigger/closer object to trigger (fewer false alarms);
     #   lower  -> reacts to small objects (more sensitive, more false alarms).
