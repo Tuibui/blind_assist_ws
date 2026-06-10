@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1600px; height:1000px; }
+  body {
+    font-family:"Noto Sans Thai","Noto Color Emoji",sans-serif;
+    background:linear-gradient(135deg,#eef4ff 0%,#f7fbff 45%,#fff6f0 100%);
+    color:#10243e;
+    padding:48px 56px;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---------- header ---------- */
+  .head { text-align:center; margin-bottom:30px; }
+  .badge {
+    display:inline-block; background:#1f6feb; color:#fff;
+    font-size:18px; font-weight:700; letter-spacing:.5px;
+    padding:7px 20px; border-radius:999px; margin-bottom:14px;
+    box-shadow:0 6px 18px rgba(31,111,235,.35);
+  }
+  h1 { font-size:46px; font-weight:800; line-height:1.15; color:#0b1f3a; }
+  .sub { font-size:21px; color:#5a6b80; margin-top:10px; font-weight:500; }
+
+  /* ---------- flow row ---------- */
+  .flow {
+    display:flex; align-items:stretch; justify-content:center;
+    gap:8px; margin:8px 0 34px;
+  }
+  .step {
+    flex:1; background:#fff; border-radius:22px; padding:24px 16px;
+    text-align:center; box-shadow:0 10px 28px rgba(20,50,90,.10);
+    border:2px solid #e3ecf7; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  }
+  .step .ic { font-size:62px; line-height:1; margin-bottom:12px; }
+  .step .t { font-size:24px; font-weight:800; color:#143257; }
+  .step .d { font-size:16px; color:#62748c; margin-top:7px; line-height:1.4; }
+  .step .tag {
+    margin-top:12px; font-size:13px; font-weight:700; color:#1f6feb;
+    background:#eaf2ff; padding:4px 12px; border-radius:999px;
+  }
+  .arrow { display:flex; align-items:center; font-size:40px; color:#9fb4cf; font-weight:800; }
+
+  /* number chips */
+  .num {
+    position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+    width:32px; height:32px; border-radius:50%; background:#1f6feb; color:#fff;
+    font-size:17px; font-weight:800; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 10px rgba(31,111,235,.4);
+  }
+
+  /* ---------- modes ---------- */
+  .modes-title { text-align:center; font-size:23px; font-weight:800; color:#0b1f3a; margin-bottom:16px; }
+  .modes-title span { color:#1f6feb; }
+  .modes { display:flex; gap:22px; flex:1; }
+  .mode {
+    flex:1; border-radius:24px; padding:26px 24px; color:#fff;
+    box-shadow:0 14px 32px rgba(20,50,90,.18);
+    display:flex; flex-direction:column;
+  }
+  .mode .ic { font-size:58px; line-height:1; margin-bottom:10px; }
+  .mode .mt { font-size:27px; font-weight:800; }
+  .mode .md { font-size:18px; margin-top:10px; line-height:1.5; opacity:.96; }
+  .mode .ex {
+    margin-top:auto; font-size:16px; font-weight:700;
+    background:rgba(255,255,255,.22); padding:9px 14px; border-radius:12px;
+    backdrop-filter:blur(2px);
+  }
+  .m-walk  { background:linear-gradient(150deg,#2da44e,#1a7f3c); }
+  .m-money { background:linear-gradient(150deg,#e0892b,#c46a16); }
+  .m-face  { background:linear-gradient(150deg,#8957e5,#6c3fc4); }
+
+  /* ---------- footer ---------- */
+  .foot { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:26px; }
+  .chip {
+    font-size:16px; font-weight:700; color:#34465c;
+    background:#fff; border:2px solid #dce6f2; padding:8px 18px; border-radius:999px;
+    box-shadow:0 4px 12px rgba(20,50,90,.06);
+  }
+  .chip b { color:#1f6feb; }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <div class="badge">🦾 ผู้ช่วยอัจฉริยะสำหรับผู้พิการทางสายตา</div>
+    <h1>กล้องที่ “มองเห็นแทนตา” แล้วบอกด้วยเสียง</h1>
+    <div class="sub">สั่งงานด้วยเสียง · ตรวจจับด้วย AI · แจ้งผลทันทีเป็นภาษาพูด</div>
+  </div>
+
+  <!-- 4-STEP FLOW -->
+  <div class="flow">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="ic">🗣️</div>
+      <div class="t">ผู้ใช้พูดสั่ง</div>
+      <div class="d">บอกสิ่งที่อยากให้ช่วย<br>ด้วยเสียงพูด</div>
+      <div class="tag">“เช็คเงิน”</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="ic">👓</div>
+      <div class="t">กล้องมองเห็น</div>
+      <div class="d">กล้องตัวเล็กติดตัว<br>มองสิ่งที่อยู่ตรงหน้า</div>
+      <div class="tag">OAK-D Lite</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="ic">🧠</div>
+      <div class="t">AI ประมวลผล</div>
+      <div class="d">แยกแยะว่าคืออะไร<br>อยู่ตรงไหน ใกล้แค่ไหน</div>
+      <div class="tag">บนเครื่อง · ไม่ต้องเน็ต</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="ic">🔊</div>
+      <div class="t">บอกผลด้วยเสียง</div>
+      <div class="d">พูดบอกผู้ใช้ทันที<br>พร้อมจอแสดงผลสำหรับผู้ดูแล</div>
+      <div class="tag">“ธนบัตร 100 บาท”</div>
+    </div>
+  </div>
+
+  <!-- MODES -->
+  <div class="modes-title">ทำได้ <span>3 โหมด</span> — สลับได้ด้วยเสียง</div>
+  <div class="modes">
+    <div class="mode m-walk">
+      <div class="ic">🚶</div>
+      <div class="mt">โหมดเดินนำทาง</div>
+      <div class="md">เตือนเมื่อมีสิ่งกีดขวางอยู่ใกล้ บอกทิศ <b>ซ้าย / กลาง / ขวา</b> จับได้ทุกอย่าง ทั้งกำแพง เสา กล่อง</div>
+      <div class="ex">🔔 “มีสิ่งกีดขวางด้านขวา”</div>
+    </div>
+    <div class="mode m-money">
+      <div class="ic">💵</div>
+      <div class="mt">โหมดอ่านธนบัตร</div>
+      <div class="md">เล็งกล้องไปที่ธนบัตร ระบบบอก<b>ค่าเงินบาท</b>ให้ฟัง ช่วยให้จ่ายเงินเองได้อย่างมั่นใจ</div>
+      <div class="ex">💬 “ธนบัตร 100 บาท”</div>
+    </div>
+    <div class="mode m-face">
+      <div class="ic">🧑‍🤝‍🧑</div>
+      <div class="mt">โหมดจำเพื่อน</div>
+      <div class="md">จดจำใบหน้าคนรู้จัก แล้ว<b>บอกชื่อ</b>ว่าใครกำลังอยู่ตรงหน้า ทักทายได้ถูกคน</div>
+      <div class="ex">👋 “คุณตี๋”</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="chip">🍓 <b>Raspberry Pi</b> — สมองพกพา</div>
+    <div class="chip">📷 <b>OAK-D Lite</b> — กล้อง AI + วัดระยะ</div>
+    <div class="chip">🤖 <b>ROS 2</b> — เชื่อมทุกส่วนเข้าด้วยกัน</div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+digraph blind_assist {
+    rankdir=LR;
+    bgcolor="#0d1117";
+    splines=ortho;
+    forcelabels=true;
+    nodesep=1.1;
+    ranksep=3.2;
+    fontname="Helvetica";
+    pad=0.4;
+
+    labelloc="t";
+    fontsize=26;
+    fontcolor="#e6edf3";
+    label=<<b>Blind Assist &#8212; ROS 2 Node Diagram</b><br/><font point-size="14" color="#8b949e">4 nodes working together &#183; edge labels = what data is exchanged</font><br/> >;
+
+    // ---------- node style ----------
+    node [shape=box, style="rounded,filled", fontname="Helvetica-Bold",
+          fontsize=15, fontcolor="#ffffff", penwidth=2, margin="0.30,0.22"];
+
+    // ---------- edge style ----------
+    edge [fontname="Helvetica", fontsize=12, fontcolor="#c9d4e0",
+          color="#6e7681", penwidth=1.8, arrowsize=0.9];
+
+    // ===== NODES =====
+    SL [label=<speech_logger_node<br/><font point-size="11" color="#c9e6ff">listens for voice commands</font>>,
+        fillcolor="#8957e5", color="#bc8cff"];
+
+    MP [label=<main_pipeline_node<br/><font point-size="11" color="#d2f5dd">camera + AI processing</font>>,
+        fillcolor="#2da44e", color="#56d364"];
+
+    DA [label=<decision_audio_node<br/><font point-size="11" color="#cfe3ff">decides + speaks out loud</font>>,
+        fillcolor="#1f6feb", color="#58a6ff"];
+
+    WD [label=<web_display_node<br/><font point-size="11" color="#cfe3ff">web dashboard (:8080)</font>>,
+        fillcolor="#1f6feb", color="#58a6ff"];
+
+    LANG [label=<language setting<br/><font point-size="10" color="#8b949e">Thai / English</font>>,
+          shape=note, fillcolor="#373e47", color="#6e7681", fontsize=12];
+
+    // ===== speech_logger -> main_pipeline (commands) =====
+    SL -> MP [xlabel="switch mode", color="#bc8cff", fontcolor="#d2b3ff"];
+    SL -> MP [xlabel="navigation on/off", color="#bc8cff", fontcolor="#d2b3ff"];
+
+    // ===== main_pipeline -> decision_audio (detections) =====
+    MP -> DA [xlabel="banknote result", color="#56d364", fontcolor="#7ee787"];
+    MP -> DA [xlabel="obstacle (left/center/right)", color="#56d364", fontcolor="#7ee787"];
+    MP -> DA [xlabel="recognized face", color="#56d364", fontcolor="#7ee787"];
+    MP -> DA [xlabel="walking path", color="#56d364", fontcolor="#7ee787"];
+
+    // ===== current_mode (fan-out to 3 subscribers) =====
+    MP -> DA [xlabel="current mode", color="#e3b341", fontcolor="#f2cc60"];
+    MP -> WD [xlabel="current mode", color="#e3b341", fontcolor="#f2cc60"];
+    MP -> SL [xlabel="current mode", color="#e3b341", fontcolor="#f2cc60", constraint=false];
+
+    // ===== main_pipeline -> web (video) =====
+    MP -> WD [xlabel="live video", color="#56d364", fontcolor="#7ee787"];
+
+    // ===== decision_audio -> web (announcement) =====
+    DA -> WD [xlabel="spoken text", color="#58a6ff", fontcolor="#79c0ff"];
+
+    // ===== language (dashed manual override) =====
+    LANG -> DA [style=dashed, color="#8b949e"];
+    LANG -> SL [style=dashed, color="#8b949e"];
+
+    { rank=same; DA; WD; }
+}
