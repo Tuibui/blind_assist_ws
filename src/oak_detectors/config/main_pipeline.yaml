@@ -34,9 +34,9 @@ main_pipeline_node:
     # =====================================================================
     # Face recognition (mode 3): NN Archive at models/myfriend_face/best.rvc2.tar.xz
     # (path is auto-resolved like money_model_path). Classes intrinsic to model:
-    # ["Tee", "Ping"]. Just speak whoever is seen.
+    # ["book", "pearn", "tonnam"]. Just speak whoever is seen.
     # face_labels: known person names, order must match the model's classes.
-    face_labels: ["Tee", "Ping"]
+    face_labels: ["book", "pearn", "tonnam"]
     # face_confidence_threshold: min confidence to announce a face (0.0–1.0).
     #   Kept high (0.7) so it only speaks a name when fairly sure.
     #   Raise -> fewer wrong-name calls; Lower -> recognizes from further/blurrier.

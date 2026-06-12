@@ -55,7 +55,7 @@ class MainPipelineNode(Node):
         # โหมดจำใบหน้า (FACE): ใช้ NN Archive รูปแบบเดียวกับโหมดเงิน คลาสคือชื่อเพื่อน
         # ที่เทรนโมเดลมา — ตรวจเจอใครก็พูดชื่อคนนั้น
         self.declare_parameter("face_model_path", str(default_face_model))
-        self.declare_parameter("face_labels", ["Tee", "Ping"])
+        self.declare_parameter("face_labels", ["book", "pearn", "tonnam"])
         self.declare_parameter("face_confidence_threshold", 0.5)
         self.declare_parameter("confidence_threshold", 0.2)
         self.declare_parameter("confidence_thresholds", [0.6, 0.6, 0.20, 0.4, 0.45])
