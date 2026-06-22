@@ -18,7 +18,7 @@ from pathlib import Path
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import Int32, String
 
 from oak_interfaces.msg import Detection2DArray, Mode
 
@@ -126,6 +126,19 @@ class DecisionAudioNode(Node):
         )
         self.declare_parameter(
             "undervoltage_en", "Warning, low power supply. Please check the battery."
+        )
+        # เตือนเมื่อ % แบต (จาก web_display_node) ตกผ่านเกณฑ์ที่กำหนด (มากไปน้อย)
+        # พูดครั้งเดียวต่อเกณฑ์ จะเตือนซ้ำได้ก็ต่อเมื่อชาร์จกลับขึ้นเกิน
+        # เกณฑ์ + battery_warn_rearm_margin (กันพูดรัวตอนค่าสั่นรอบ ๆ เกณฑ์)
+        self.declare_parameter("battery_warn_enabled", True)
+        self.declare_parameter("battery_percent_topic", "/oak/battery_percent")
+        self.declare_parameter("battery_warn_levels", [20, 15, 10])
+        self.declare_parameter("battery_warn_rearm_margin", 3)
+        self.declare_parameter(
+            "battery_warn_th", "แบตเตอรี่เหลือ {pct} เปอร์เซ็นต์ กรุณาชาร์จ"
+        )
+        self.declare_parameter(
+            "battery_warn_en", "Battery low, {pct} percent remaining. Please charge."
         )
 
         money_topic = self.get_parameter("money_detections_topic").value
@@ -239,6 +252,21 @@ class DecisionAudioNode(Node):
         self.create_subscription(Detection2DArray, tactile_topic, self._on_tactile_path, 10)
         self.create_subscription(Mode, current_mode_topic, self._on_mode, 10)
         self.create_subscription(String, language_topic, self._on_language, 10)
+
+        # เตือนแบตต่ำตาม % ที่ web_display_node เผยแพร่มา (เกณฑ์เรียงมากไปน้อย)
+        self._battery_warn_enabled = bool(self.get_parameter("battery_warn_enabled").value)
+        self._battery_warn_levels = sorted(
+            (int(x) for x in self.get_parameter("battery_warn_levels").value), reverse=True
+        )
+        self._battery_rearm_margin = int(self.get_parameter("battery_warn_rearm_margin").value)
+        self._battery_warned = set()  # เกณฑ์ที่เตือนไปแล้ว (รอ re-arm เมื่อชาร์จกลับ)
+        if self._battery_warn_enabled and self._battery_warn_levels:
+            self.create_subscription(
+                Int32,
+                str(self.get_parameter("battery_percent_topic").value),
+                self._on_battery_percent,
+                10,
+            )
 
         self._undervoltage_repeat_sec = float(
             self.get_parameter("undervoltage_repeat_sec").value
@@ -625,6 +653,37 @@ class DecisionAudioNode(Node):
             str(self.get_parameter("undervoltage_en").value),
             key="power", priority=PRIO_POWER,
         )
+
+    def _on_battery_percent(self, msg: Int32) -> None:
+        """เตือนเมื่อ % แบตตกผ่านเกณฑ์ (เช่น 20/15/10).
+
+        - พูด "เกณฑ์ต่ำสุดที่เพิ่งตกผ่าน" หนึ่งครั้ง (ถ้าดิ่งเร็วข้ามหลายเกณฑ์
+          พร้อมกันจะพูดเฉพาะอันที่วิกฤตสุด ไม่พูดไล่ทีละขั้น)
+        - เตือนเกณฑ์เดิมซ้ำได้ก็ต่อเมื่อชาร์จกลับขึ้นเกิน เกณฑ์ + rearm_margin
+          (กันพูดรัวตอนค่าสั่นรอบ ๆ เกณฑ์)
+        """
+        pct = int(msg.data)
+
+        # ชาร์จกลับขึ้นพ้นเกณฑ์ + ระยะกันสั่น -> ปลดล็อกให้เตือนเกณฑ์นั้นได้อีก
+        for level in list(self._battery_warned):
+            if pct > level + self._battery_rearm_margin:
+                self._battery_warned.discard(level)
+
+        crossed = [
+            lvl for lvl in self._battery_warn_levels
+            if pct <= lvl and lvl not in self._battery_warned
+        ]
+        if not crossed:
+            return
+        # crossed เรียงมากไปน้อยอยู่แล้ว -> ตัวสุดท้ายคือเกณฑ์วิกฤตสุดที่จะพูด
+        worst = crossed[-1]
+        for lvl in crossed:
+            self._battery_warned.add(lvl)
+
+        th = str(self.get_parameter("battery_warn_th").value).format(pct=pct)
+        en = str(self.get_parameter("battery_warn_en").value).format(pct=pct)
+        self.get_logger().warning(f"Battery low: {pct}% (crossed {worst}% threshold)")
+        self._say(th, en, key="battery", priority=PRIO_POWER, min_repeat=0.0)
 
     def _on_mode(self, msg: Mode) -> None:
         if not self._announce_mode_changes:

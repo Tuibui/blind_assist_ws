@@ -37,6 +37,14 @@ decision_audio_node:
     undervoltage_repeat_sec: 60.0
     undervoltage_th: "คำเตือน ไฟเลี้ยงต่ำ กรุณาตรวจสอบแบตเตอรี่"
     undervoltage_en: "Warning, low power supply. Please check the battery."
+    # เตือนแบตต่ำตาม % ที่ web_display_node เผยแพร่มา (เกณฑ์เรียงมากไปน้อย)
+    # พูดครั้งเดียวต่อเกณฑ์ เตือนซ้ำได้เมื่อชาร์จกลับขึ้นเกิน เกณฑ์ + rearm_margin
+    battery_warn_enabled: true
+    battery_percent_topic: /oak/battery_percent
+    battery_warn_levels: [20, 15, 10]
+    battery_warn_rearm_margin: 3
+    battery_warn_th: "แบตเตอรี่เหลือ {pct} เปอร์เซ็นต์ กรุณาชาร์จ"
+    battery_warn_en: "Battery low, {pct} percent remaining. Please charge."
 
 web_display_node:
   ros__parameters:
@@ -45,6 +53,20 @@ web_display_node:
     preview_topic: /oak/preview/compressed
     http_host: 0.0.0.0
     http_port: 8080
+    # --- Battery monitor (ADS1115 on A0, 3S LiPo via 1.2k/0.67k divider) ---
+    # The ADC reads the voltage across the 0.67k resistor. Full 3S = 12.6V ->
+    # ~4.51V at the pin, so power the ADS1115 from 5V and keep the 6.144V range.
+    battery_enable: true
+    battery_i2c_bus: 1
+    battery_i2c_addr: 0x48        # ADDR -> GND
+    battery_channel: 0            # A0
+    battery_fsr_volts: 6.144      # full-scale range (+/-6.144V); MUST be >= ~4.6V
+    battery_r_top_ohms: 1200.0    # resistor from battery+ to the A0 node
+    battery_r_bottom_ohms: 670.0  # resistor from A0 node to GND (measured across)
+    battery_calibration: 1.010    # multiply if a multimeter disagrees: real/shown (11.2/11.41)
+    battery_cells: 3              # 3S -> percent uses per-cell voltage
+    battery_poll_sec: 5.0
+    battery_percent_topic: /oak/battery_percent  # ส่ง % ให้ decision_audio_node เตือนแบตต่ำ
 
 speech_logger_node:
   ros__parameters:
